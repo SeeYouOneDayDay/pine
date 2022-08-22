@@ -28,49 +28,79 @@ android {
         }
     }
 
-    packagingOptions {
-        resources {
-            excludes += '/META-INF/**'
-            excludes += '/*.properties'
-        }
+//    packagingOptions {
+//        resources {
+//            excludes += '/META-INF/**'
+//            excludes += '/*.properties'
+//        }
+//    }
+//
+//    publishing {
+//        singleVariant("release") {
+//            withSourcesJar()
+//            withJavadocJar()
+//        }
+//    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
-
-    publishing {
-        singleVariant("release") {
-            withSourcesJar()
-            withJavadocJar()
-        }
+    dexOptions {
+        preDexLibraries false
+        maxProcessCount 8
+        javaMaxHeapSize "4g"
+    }
+    aaptOptions {
+        cruncherEnabled = false
+        useNewCruncher = false
+    }
+    lintOptions {
+        checkReleaseBuilds false
+        abortOnError false
+        warningsAsErrors false
+        disable "UnusedResources"
+        textOutput "stdout"
+        textReport false
+        disable 'RestrictedApi'
     }
 }
+
+tasks.withType(Javadoc) {
+    options.addStringOption('Xdoclint:none', '-quiet')
+    options.addStringOption('encoding', 'UTF-8')
+    options.addStringOption('charSet', 'UTF-8')
+    options.encoding = "UTF-8"
+}
+
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     compileOnly project(':core')
 }
 
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            group rootProject.groupId
-            artifactId 'xposed'
-            version '0.0.9'
-            // the components are created only during the afterEvaluate phase
-            afterEvaluate {
-                from components.release
-            }
-            pom {
-                name = rootProject.repoName
-                description = 'pine hook xposed compat'
-                url = rootProject.website
-                licenses rootProject.licenses
-                developers rootProject.developers
-                scm rootProject.scm
-            }
-        }
-    }
-    repositories rootProject.uploadRepositories
-}
-
-signing {
-    sign publishing.publications.mavenJava
-}
+//publishing {
+//    publications {
+//        mavenJava(MavenPublication) {
+//            group rootProject.groupId
+//            artifactId 'xposed'
+//            version '0.0.9'
+//            // the components are created only during the afterEvaluate phase
+//            afterEvaluate {
+//                from components.release
+//            }
+//            pom {
+//                name = rootProject.repoName
+//                description = 'pine hook xposed compat'
+//                url = rootProject.website
+//                licenses rootProject.licenses
+//                developers rootProject.developers
+//                scm rootProject.scm
+//            }
+//        }
+//    }
+//    repositories rootProject.uploadRepositories
+//}
+//
+//signing {
+//    sign publishing.publications.mavenJava
+//}
