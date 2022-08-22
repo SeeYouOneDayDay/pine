@@ -10,7 +10,7 @@ import top.canyie.pine.Pine;
  * you manually call them. Make sure you are sure you really want this!
  * @author canyie
  * @see MethodHook
- * @see Pine#hook(java.lang.reflect.Member, MethodHook) 
+ * @see Pine#hook(java.lang.reflect.Member, MethodHook)
  */
 public abstract class MethodReplacement extends MethodHook {
     /**
@@ -18,7 +18,8 @@ public abstract class MethodReplacement extends MethodHook {
      * will do nothing and return null.
      */
     public static final MethodReplacement DO_NOTHING = new MethodReplacement() {
-        @Override protected Object replaceCall(Pine.CallFrame callFrame) {
+        @Override
+        protected Object replaceCall(Pine.CallFrame callFrame) {
             return null;
         }
     };
@@ -33,7 +34,8 @@ public abstract class MethodReplacement extends MethodHook {
      */
     protected abstract Object replaceCall(Pine.CallFrame callFrame) throws Throwable;
 
-    @Override public final void beforeCall(Pine.CallFrame callFrame) {
+    @Override
+    public final void beforeCall(Pine.CallFrame callFrame) {
         try {
             callFrame.setResult(replaceCall(callFrame));
         } catch (Throwable e) {
@@ -41,7 +43,8 @@ public abstract class MethodReplacement extends MethodHook {
         }
     }
 
-    @Override public final void afterCall(Pine.CallFrame callFrame) {
+    @Override
+    public final void afterCall(Pine.CallFrame callFrame) {
     }
 
     /**
@@ -51,7 +54,8 @@ public abstract class MethodReplacement extends MethodHook {
      */
     public static MethodReplacement returnConstant(final Object result) {
         return new MethodReplacement() {
-            @Override protected Object replaceCall(Pine.CallFrame callFrame) {
+            @Override
+            protected Object replaceCall(Pine.CallFrame callFrame) {
                 return result;
             }
         };

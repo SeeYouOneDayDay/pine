@@ -1,7 +1,6 @@
 package top.canyie.pine.entry;
 
 import top.canyie.pine.Pine;
-import top.canyie.pine.utils.Primitives;
 import top.canyie.pine.utils.Three;
 
 /**
@@ -16,6 +15,7 @@ public final class Arm64Entry {
     private static final long INT_BITS = 0xffffffffL;
     private static final long SHORT_BITS = 0xffffL;
     private static final long BYTE_BITS = 0xffL;
+
     private Arm64Entry() {
     }
 
@@ -160,7 +160,7 @@ public final class Arm64Entry {
     }
 
     private static Three<long[], long[], double[]> getArgs(Pine.HookRecord hookRecord, long extras, long sp,
-                                                         long x4, long x5, long x6, long x7) {
+                                                           long x4, long x5, long x6, long x7) {
         // TODO: Cache these values
         int crLength = 0;
         int stackLength = 0;
@@ -178,7 +178,7 @@ public final class Arm64Entry {
             if (!hookRecord.isStatic) {
                 typeWides[0] = false; // this object is a reference, always 32-bit
             }
-            for (int i = 0;i < hookRecord.paramNumber;i++) {
+            for (int i = 0; i < hookRecord.paramNumber; i++) {
                 Class<?> paramType = hookRecord.paramTypes[i];
                 boolean fp;
                 boolean wide;
@@ -229,7 +229,7 @@ public final class Arm64Entry {
             coreRegisters[5] = x6;
             if (crLength == 6) break;
             coreRegisters[6] = x7;
-        } while(false);
+        } while (false);
 
         return new Three<>(coreRegisters, stack, fpRegisters);
     }

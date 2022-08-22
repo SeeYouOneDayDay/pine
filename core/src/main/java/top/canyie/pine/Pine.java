@@ -4,8 +4,6 @@ import android.annotation.SuppressLint;
 import android.os.Build;
 import android.util.Log;
 
-import top.canyie.pine.callback.MethodHook;
-
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Member;
@@ -18,6 +16,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+
+import top.canyie.pine.callback.MethodHook;
 
 /**
  * The bridge class provides main APIs for you.
@@ -52,7 +52,8 @@ public final class Pine {
             return hook.new Unhook(hookRecord);
         }
 
-        @Override public void handleUnhook(HookRecord hookRecord, MethodHook hook) {
+        @Override
+        public void handleUnhook(HookRecord hookRecord, MethodHook hook) {
             hookRecord.removeCallback(hook);
         }
     };
@@ -98,7 +99,8 @@ public final class Pine {
         return buildCodename.compareTo(codename.toUpperCase(Locale.ROOT)) >= 0;
     }
 
-    @SuppressLint("ObsoleteSdkInt") private static void initialize() {
+    @SuppressLint("ObsoleteSdkInt")
+    private static void initialize() {
         int sdkLevel = PineConfig.sdkLevel;
         if (sdkLevel < Build.VERSION_CODES.KITKAT)
             throw new RuntimeException("Unsupported android sdk level " + sdkLevel);
@@ -139,14 +141,14 @@ public final class Pine {
 
             if (arch == ARCH_ARM64) {
                 entryClassName = "top.canyie.pine.entry.Arm64Entry";
-                paramTypes = new Class<?>[] {long.class, long.class, long.class,
+                paramTypes = new Class<?>[]{long.class, long.class, long.class,
                         long.class, long.class, long.class, long.class};
             } else if (arch == ARCH_ARM) {
                 entryClassName = "top.canyie.pine.entry.Arm32Entry";
-                paramTypes = new Class<?>[] {int.class, int.class, int.class};
+                paramTypes = new Class<?>[]{int.class, int.class, int.class};
             } else if (arch == ARCH_X86) {
                 entryClassName = "top.canyie.pine.entry.X86Entry";
-                paramTypes = new Class<?>[] {int.class, int.class, int.class};
+                paramTypes = new Class<?>[]{int.class, int.class, int.class};
             } else throw new RuntimeException("Unexpected arch " + arch);
 
             // Use Class.forName() to ensure entry class is initialized.
@@ -474,8 +476,8 @@ public final class Pine {
             // Not hooked, try to invoke it directly (but it may have side effect)
             if (PineConfig.debug)
                 Log.w(TAG, "Attempting to invoke original implementation on a not-hooked method " + method
-                    + ". This is undefined behavior and may have side effect (e.g. if other threads hooked "
-                    + "the method before we actually call Method.invoke(), the registered hooks will be triggered).", new Throwable("here"));
+                        + ". This is undefined behavior and may have side effect (e.g. if other threads hooked "
+                        + "the method before we actually call Method.invoke(), the registered hooks will be triggered).", new Throwable("here"));
             if (method instanceof Constructor) {
                 if (thisObject != null)
                     throw new IllegalArgumentException(
@@ -830,6 +832,7 @@ public final class Pine {
     public interface HookHandler {
         MethodHook.Unhook handleHook(HookRecord hookRecord, MethodHook hook, int modifiers,
                                      boolean newMethod, boolean canInitDeclaringClass);
+
         void handleUnhook(HookRecord hookRecord, MethodHook hook);
     }
 

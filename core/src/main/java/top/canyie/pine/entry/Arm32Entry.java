@@ -20,6 +20,7 @@ public final class Arm32Entry {
     // https://android-review.googlesource.com/c/platform/art/+/109033
     // TODO: Use different entries for hardfp and softfp
     private static final boolean USE_HARDFP = PineConfig.sdkLevel >= Build.VERSION_CODES.M;
+
     private Arm32Entry() {
     }
 
@@ -31,11 +32,11 @@ public final class Arm32Entry {
         return (int) handleBridge(artMethod, extras, sp);
     }
 
-    private static long longBridge(int artMethod,int extras, int sp) throws Throwable {
+    private static long longBridge(int artMethod, int extras, int sp) throws Throwable {
         return (long) handleBridge(artMethod, extras, sp);
     }
 
-    private static double doubleBridge(int artMethod,int extras, int sp) throws Throwable {
+    private static double doubleBridge(int artMethod, int extras, int sp) throws Throwable {
         return (double) handleBridge(artMethod, extras, sp);
     }
 
@@ -102,7 +103,7 @@ public final class Arm32Entry {
 
         if (hookRecord.paramNumber > 0) {
             args = new Object[hookRecord.paramNumber];
-            for (int i = 0;i < hookRecord.paramNumber;i++) {
+            for (int i = 0; i < hookRecord.paramNumber; i++) {
                 Class<?> paramType = hookRecord.paramTypes[i];
                 Object value;
                 if (paramType == double.class) {

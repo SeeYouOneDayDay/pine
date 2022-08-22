@@ -6,7 +6,8 @@ import android.os.Build;
  * A class to stores some configures.
  * @author canyie
  */
-@SuppressWarnings("WeakerAccess") public final class PineConfig {
+@SuppressWarnings("WeakerAccess")
+public final class PineConfig {
     public static int sdkLevel;
     /**
      * Whether we need to print more detailed logs.
@@ -39,7 +40,8 @@ import android.os.Build;
      * @see Pine.LibLoader
      */
     public static Pine.LibLoader libLoader = new Pine.LibLoader() {
-        @Override public void loadLib() {
+        @Override
+        public void loadLib() {
             System.loadLibrary("pine");
         }
     };

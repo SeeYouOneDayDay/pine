@@ -39,12 +39,13 @@ public final class ReflectionHelper {
 
     public static Field getField(Class<?> c, String name) {
         Field field = findField(c, name);
-        if (field == null) throw new IllegalArgumentException("No field " + name + " found in " + c);
+        if (field == null)
+            throw new IllegalArgumentException("No field " + name + " found in " + c);
         return field;
     }
 
     public static Field findField(Class<?> c, String name) {
-        for (;c != null;c = c.getSuperclass()) {
+        for (; c != null; c = c.getSuperclass()) {
             try {
                 Field field = c.getDeclaredField(name);
                 field.setAccessible(true);
@@ -63,7 +64,7 @@ public final class ReflectionHelper {
     }
 
     public static Method findMethod(Class<?> c, String name, Class<?>... paramTypes) {
-        for (;c != null;c = c.getSuperclass()) {
+        for (; c != null; c = c.getSuperclass()) {
             try {
                 Method method = c.getDeclaredMethod(name, paramTypes);
                 method.setAccessible(true);

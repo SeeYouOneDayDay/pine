@@ -8,6 +8,7 @@ import top.canyie.pine.utils.Primitives;
  */
 public final class X86Entry {
     private static final int[] EMPTY_INT_ARRAY = new int[0];
+
     private X86Entry() {
     }
 
@@ -19,11 +20,11 @@ public final class X86Entry {
         return (int) handleBridge(artMethod, extras, ebx);
     }
 
-    private static long longBridge(int artMethod,int extras, int ebx) throws Throwable {
+    private static long longBridge(int artMethod, int extras, int ebx) throws Throwable {
         return (long) handleBridge(artMethod, extras, ebx);
     }
 
-    private static double doubleBridge(int artMethod,int extras, int ebx) throws Throwable {
+    private static double doubleBridge(int artMethod, int extras, int ebx) throws Throwable {
         return (double) handleBridge(artMethod, extras, ebx);
     }
 
@@ -71,7 +72,7 @@ public final class X86Entry {
 
         if (hookRecord.paramNumber > 0) {
             args = new Object[hookRecord.paramNumber];
-            for (int i = 0;i < hookRecord.paramNumber;i++) {
+            for (int i = 0; i < hookRecord.paramNumber; i++) {
                 Class<?> paramType = hookRecord.paramTypes[i];
                 Object value;
                 if (paramType.isPrimitive()) {

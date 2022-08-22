@@ -74,7 +74,8 @@ public class ModuleClassLoader extends PathClassLoader {
     }
 
     // Pine added: public findClass
-    @Override public Class<?> findClass(String name) throws ClassNotFoundException {
+    @Override
+    public Class<?> findClass(String name) throws ClassNotFoundException {
         return super.findClass(name);
     }
 
@@ -102,18 +103,18 @@ public class ModuleClassLoader extends PathClassLoader {
     }
 
     // Pine added: public findResource
-    @Override public URL findResource(String name) {
+    @Override
+    public URL findResource(String name) {
         return super.findResource(name);
     }
 
     @Override
     public Enumeration<URL> getResources(String name) throws IOException {
-        @SuppressWarnings("unchecked")
-        final Enumeration<URL>[] resources = (Enumeration<URL>[]) new Enumeration<?>[] {
+        @SuppressWarnings("unchecked") final Enumeration<URL>[] resources = (Enumeration<URL>[]) new Enumeration<?>[]{
                 Object.class.getClassLoader().getResources(name),
                 findResources(name),
                 (getParent() == null)
-                        ? null : getParent().getResources(name) };
+                        ? null : getParent().getResources(name)};
 
         return new CompoundEnumeration<>(resources);
     }
