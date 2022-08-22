@@ -321,6 +321,10 @@ public final class Pine {
             isInlineHook = hookMode == HookMode.INLINE;
         }
 
+
+//        Thread.currentThread()-- address?
+        //nativePeer ?
+        // @todo
         long thread = currentArtThread0();
         if ((hookRecord.isStatic = Modifier.isStatic(modifiers)) && canInitDeclaringClass) {
             resolve((Method) method);
