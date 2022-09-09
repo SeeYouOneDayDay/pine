@@ -163,13 +163,16 @@ TrampolineInstaller::InstallReplacementTrampoline(art::ArtMethod* target, art::A
 
 void* TrampolineInstaller::InstallInlineTrampoline(art::ArtMethod* target, art::ArtMethod* bridge,
                                                    bool skip_first_few_bytes) {
+    // 获取编译后的地址(jit编译后的)entry_point_from_compiled_code
     void* target_code_addr = target->GetCompiledCodeAddr();
+    // 修改可读写
     bool target_code_writable = Memory::Unprotect(target_code_addr);
     if (UNLIKELY(!target_code_writable)) {
         LOGE("Failed to make target code writable!");
         return nullptr;
     }
 
+    // 真正目标方法大小
     size_t backup_size = kDirectJumpTrampolineSize;
     if (skip_first_few_bytes) backup_size += kSkipBytes;
 

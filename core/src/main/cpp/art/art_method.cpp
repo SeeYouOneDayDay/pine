@@ -16,21 +16,22 @@ uint32_t ArtMethod::kAccCompileDontBother = 0;
 uint32_t ArtMethod::kAccPreCompiled = 0;
 
 size_t ArtMethod::size = 0;
-void* ArtMethod::art_quick_to_interpreter_bridge = nullptr;
-void* ArtMethod::art_quick_generic_jni_trampoline = nullptr;
-void* ArtMethod::art_interpreter_to_compiled_code_bridge = nullptr;
-void* ArtMethod::art_interpreter_to_interpreter_bridge = nullptr;
+void *ArtMethod::art_quick_to_interpreter_bridge = nullptr;
+void *ArtMethod::art_quick_generic_jni_trampoline = nullptr;
+void *ArtMethod::art_interpreter_to_compiled_code_bridge = nullptr;
+void *ArtMethod::art_interpreter_to_interpreter_bridge = nullptr;
 
-void (*ArtMethod::copy_from)(ArtMethod*, ArtMethod*, size_t) = nullptr;
-void (*ArtMethod::throw_invocation_time_error)(ArtMethod*) = nullptr;
+void (*ArtMethod::copy_from)(ArtMethod *, ArtMethod *, size_t) = nullptr;
+
+void (*ArtMethod::throw_invocation_time_error)(ArtMethod *) = nullptr;
 
 Member<ArtMethod, uint32_t> ArtMethod::access_flags_;
-Member<ArtMethod, void*> ArtMethod::entry_point_from_jni_;
-Member<ArtMethod, void*> ArtMethod::entry_point_from_compiled_code_;
-Member<ArtMethod, void*>* ArtMethod::entry_point_from_interpreter_;
-Member<ArtMethod, uint32_t>* ArtMethod::declaring_class = nullptr;
+Member<ArtMethod, void *> ArtMethod::entry_point_from_jni_;
+Member<ArtMethod, void *> ArtMethod::entry_point_from_compiled_code_;
+Member<ArtMethod, void *> *ArtMethod::entry_point_from_interpreter_;
+Member<ArtMethod, uint32_t> *ArtMethod::declaring_class = nullptr;
 
-void ArtMethod::Init(const ElfImg* handle) {
+void ArtMethod::Init(const ElfImg *handle) {
     art_quick_to_interpreter_bridge = handle->GetSymbolAddress("art_quick_to_interpreter_bridge");
     art_quick_generic_jni_trampoline = handle->GetSymbolAddress("art_quick_generic_jni_trampoline");
 
@@ -41,7 +42,7 @@ void ArtMethod::Init(const ElfImg* handle) {
                 "artInterpreterToInterpreterBridge");
     }
 
-    const char* symbol_copy_from = nullptr;
+    const char *symbol_copy_from = nullptr;
     if (Android::version >= Android::kO) {
         // art::ArtMethod::CopyFrom(art::ArtMethod *, art::PointerSize)
         symbol_copy_from = "_ZN3art9ArtMethod8CopyFromEPS0_NS_11PointerSizeE";
@@ -64,63 +65,67 @@ void ArtMethod::Init(const ElfImg* handle) {
     }
 
     if (symbol_copy_from)
-        copy_from = reinterpret_cast<void (*)(ArtMethod*, ArtMethod*, size_t)>(
+        copy_from = reinterpret_cast<void (*)(ArtMethod *, ArtMethod *, size_t)>(
                 handle->GetSymbolAddress(symbol_copy_from));
 
     if (UNLIKELY(Android::version == Android::kO))
-        throw_invocation_time_error = reinterpret_cast<void (*)(ArtMethod*)>(handle->GetSymbolAddress(
+        throw_invocation_time_error = reinterpret_cast<void (*)(
+                ArtMethod *)>(handle->GetSymbolAddress(
                 "_ZN3art9ArtMethod24ThrowInvocationTimeErrorEv"));
 }
 
-ArtMethod* ArtMethod::FromReflectedMethod(JNIEnv* env, jobject javaMethod) {
+ArtMethod *ArtMethod::FromReflectedMethod(JNIEnv *env, jobject javaMethod) {
     if (Android::version >= Android::kR) {
         return GetArtMethodForR(env, javaMethod);
     }
-    return reinterpret_cast<ArtMethod*>(env->FromReflectedMethod(javaMethod));
+    return reinterpret_cast<ArtMethod *>(env->FromReflectedMethod(javaMethod));
 }
 
-ArtMethod*
-ArtMethod::Require(JNIEnv* env, jclass c, const char* name, const char* signature, bool is_static) {
+ArtMethod *
+ArtMethod::Require(JNIEnv *env, jclass c, const char *name, const char *signature, bool is_static) {
     jmethodID m = is_static ? env->GetStaticMethodID(c, name, signature)
                             : env->GetMethodID(c, name, signature);
     if (Android::version >= Android::kR) {
         if (reinterpret_cast<uintptr_t>(m) & 1) {
-            ScopedLocalRef javaMethod(env, env->ToReflectedMethod(c, m, static_cast<jboolean>(is_static)));
+            ScopedLocalRef javaMethod(env, env->ToReflectedMethod(c, m,
+                                                                  static_cast<jboolean>(is_static)));
             return GetArtMethodForR(env, javaMethod.Get());
         }
     }
-    return reinterpret_cast<ArtMethod*>(m);
+    return reinterpret_cast<ArtMethod *>(m);
 }
 
+// 方法大小, 两联系方法地址相减获取
 static inline size_t Difference(intptr_t a, intptr_t b) {
     intptr_t size = b - a;
     if (size < 0) size = -size;
     return static_cast<size_t>(size);
 }
 
-void ArtMethod::InitMembers(JNIEnv* env, ArtMethod* m1, ArtMethod* m2, ArtMethod* m3, uint32_t access_flags) {
+void ArtMethod::InitMembers(JNIEnv *env, ArtMethod *m1, ArtMethod *m2, ArtMethod *m3,
+                            uint32_t access_flags) {
     if (Android::version >= Android::kN) {
         kAccCompileDontBother = (Android::version >= Android::kOMr1)
                                 ? AccessFlags::kCompileDontBother_O_MR1
                                 : AccessFlags::kCompileDontBother_N;
         if (Android::version >= Android::kR)
             kAccPreCompiled = (Android::version == Android::kR)
-                    ? AccessFlags::kPreCompiled_R
-                    : AccessFlags::kPreCompiled_S;
+                              ? AccessFlags::kPreCompiled_R
+                              : AccessFlags::kPreCompiled_S;
     }
 
     size = Difference(reinterpret_cast<intptr_t>(m1), reinterpret_cast<intptr_t>(m2));
     int android_version = Android::version;
     if (LIKELY(android_version >= Android::kL)) {
         for (uint32_t offset = 0; offset < size; offset += 2) {
-            void* ptr = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(m1) + offset);
-            if ((*static_cast<uint32_t*>(ptr)) == access_flags) {
+            void *ptr = reinterpret_cast<void *>(reinterpret_cast<uintptr_t>(m1) + offset);
+            if ((*static_cast<uint32_t *>(ptr)) == access_flags) {
                 access_flags_.SetOffset(offset);
             } else if (UNLIKELY(android_version == Android::kL)) {
                 // On Android 5.0, type of entry_point_from_jni_ is uint64_t
-                if ((*static_cast<uint64_t*>(ptr)) == reinterpret_cast<uint64_t>(Ruler_m1))
+                if ((*static_cast<uint64_t *>(ptr)) == reinterpret_cast<uint64_t>(Ruler_m1))
                     entry_point_from_jni_.SetOffset(offset);
-            } else if ((*static_cast<void**>(ptr)) == Ruler_m1) {
+            } else if ((*static_cast<void **>(ptr)) == Ruler_m1) {
                 entry_point_from_jni_.SetOffset(offset);
             }
 
@@ -161,7 +166,7 @@ void ArtMethod::InitMembers(JNIEnv* env, ArtMethod* m1, ArtMethod* m2, ArtMethod
         }
 
         uint32_t entry_point_member_size = Android::version == Android::kL
-                                           ? sizeof(uint64_t) : sizeof(void*);
+                                           ? sizeof(uint64_t) : sizeof(void *);
 
         if (LIKELY(entry_point_from_jni_.IsValid())) {
             uint32_t compiled_code_entry_offset = entry_point_from_jni_.GetOffset()
@@ -170,7 +175,7 @@ void ArtMethod::InitMembers(JNIEnv* env, ArtMethod* m1, ArtMethod* m2, ArtMethod
             if (Android::version >= Android::kO) {
                 // Only align offset on Android O+ (PtrSizedFields is PACKED(4) in Android N or lower.)
                 compiled_code_entry_offset = Memory::AlignUp<uint32_t>(compiled_code_entry_offset,
-                                                   entry_point_member_size);
+                                                                       entry_point_member_size);
             }
 
             entry_point_from_compiled_code_.SetOffset(compiled_code_entry_offset);
@@ -184,7 +189,7 @@ void ArtMethod::InitMembers(JNIEnv* env, ArtMethod* m1, ArtMethod* m2, ArtMethod
 
         if (Android::version < Android::kN) {
             // Not align: PtrSizedFields is PACKED(4) in the android version.
-            entry_point_from_interpreter_ = new Member<ArtMethod, void*>(
+            entry_point_from_interpreter_ = new Member<ArtMethod, void *>(
                     entry_point_from_jni_.GetOffset() - entry_point_member_size);
         } else {
             // On Android 7.0+, the declaring_class may be moved by the GC,
@@ -198,7 +203,7 @@ void ArtMethod::InitMembers(JNIEnv* env, ArtMethod* m1, ArtMethod* m2, ArtMethod
         entry_point_from_compiled_code_.SetOffset(32);
 
         // FIXME This offset has not been verified, so it may be wrong
-        entry_point_from_interpreter_ = new Member<ArtMethod, void*>(36);
+        entry_point_from_interpreter_ = new Member<ArtMethod, void *>(36);
     }
 
     if (UNLIKELY(throw_invocation_time_error)) {
@@ -211,9 +216,10 @@ void ArtMethod::InitMembers(JNIEnv* env, ArtMethod* m1, ArtMethod* m2, ArtMethod
     }
 }
 
-void ArtMethod::BackupFrom(ArtMethod* source, void* entry, bool is_inline_hook, bool is_native, bool is_proxy) {
+void ArtMethod::BackupFrom(ArtMethod *source, void *entry, bool is_inline_hook, bool is_native,
+                           bool is_proxy) {
     if (LIKELY(copy_from)) {
-        copy_from(this, source, sizeof(void*));
+        copy_from(this, source, sizeof(void *));
     } else {
         memcpy(this, source, size);
     }
@@ -311,7 +317,7 @@ void ArtMethod::AfterHook(bool is_inline_hook, bool is_native_or_proxy) {
         SetEntryPointFromInterpreter(art_interpreter_to_compiled_code_bridge);
 }
 
-bool ArtMethod::TestDontCompile(JNIEnv* env) {
+bool ArtMethod::TestDontCompile(JNIEnv *env) {
     // ThrowInvocationTimeError() has a DCHECK(IsAbstract()), so we should use abstract method to test it.
     // assert(IsAbstract());
 

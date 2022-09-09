@@ -25,11 +25,11 @@ static constexpr jint kCurrentArch =
 #ifdef __aarch64__
         kArchArm64
 #elif defined(__arm__)
-        kArchArm
+kArchArm
 #elif defined(__i386__)
-        kArchX86
+kArchX86
 #endif
-        ;
+;
 
 bool PineConfig::debug = false;
 bool PineConfig::debuggable = false;
@@ -40,41 +40,44 @@ EXPORT_C void PineSetAndroidVersion(int version) {
     Android::version = version;
 }
 
-EXPORT_C void* PineOpenElf(const char* elf) {
+EXPORT_C void *PineOpenElf(const char *elf) {
     return new ElfImg(elf);
 }
 
-EXPORT_C void PineCloseElf(void* handle) {
-    delete static_cast<ElfImg*>(handle);
+EXPORT_C void PineCloseElf(void *handle) {
+    delete static_cast<ElfImg *>(handle);
 }
 
-EXPORT_C void* PineGetElfSymbolAddress(void* handle, const char* symbol, bool warn_if_missing) {
-    return static_cast<ElfImg*>(handle)->GetSymbolAddress(symbol, warn_if_missing);
+EXPORT_C void *PineGetElfSymbolAddress(void *handle, const char *symbol, bool warn_if_missing) {
+    return static_cast<ElfImg *>(handle)->GetSymbolAddress(symbol, warn_if_missing);
 }
 
-EXPORT_C bool PineNativeInlineHookSymbolNoBackup(const char* elf, const char* symbol, void* replace) {
+EXPORT_C bool
+PineNativeInlineHookSymbolNoBackup(const char *elf, const char *symbol, void *replace) {
     ElfImg handle(elf);
-    void* addr = handle.GetSymbolAddress(symbol);
+    void *addr = handle.GetSymbolAddress(symbol);
     if (UNLIKELY(!addr)) return false;
     return TrampolineInstaller::GetOrInitDefault()->NativeHookNoBackup(addr, replace);
 }
 
-EXPORT_C void PineNativeInlineHookFuncNoBackup(void* target, void* replace) {
+EXPORT_C void PineNativeInlineHookFuncNoBackup(void *target, void *replace) {
     TrampolineInstaller::GetOrInitDefault()->NativeHookNoBackup(target, replace);
 }
 
-EXPORT_C void PineFillWithNop(void* target, size_t size) {
+EXPORT_C void PineFillWithNop(void *target, size_t size) {
     TrampolineInstaller::GetOrInitDefault()->FillWithNop(target, size);
 }
 
-void Pine_init0(JNIEnv* env, jclass Pine, jint androidVersion, jboolean debug, jboolean debuggable,
-        jboolean antiChecks, jboolean disableHiddenApiPolicy, jboolean disableHiddenApiPolicyForPlatformDomain) {
+void Pine_init0(JNIEnv *env, jclass Pine, jint androidVersion, jboolean debug, jboolean debuggable,
+                jboolean antiChecks, jboolean disableHiddenApiPolicy,
+                jboolean disableHiddenApiPolicyForPlatformDomain) {
     LOGI("Pine native init...");
     PineConfig::debug = static_cast<bool>(debug);
     PineConfig::debuggable = static_cast<bool>(debuggable);
     PineConfig::anti_checks = static_cast<bool>(antiChecks);
     TrampolineInstaller::GetOrInitDefault(); // trigger TrampolineInstaller::default_ initialization
-    Android::Init(env, androidVersion, disableHiddenApiPolicy, disableHiddenApiPolicyForPlatformDomain);
+    Android::Init(env, androidVersion, disableHiddenApiPolicy,
+                  disableHiddenApiPolicyForPlatformDomain);
     {
         ScopedLocalClassRef Ruler(env, "top/canyie/pine/Ruler");
         auto m1 = art::ArtMethod::Require(env, Ruler.Get(), "m1", "()V", true);
@@ -85,10 +88,10 @@ void Pine_init0(JNIEnv* env, jclass Pine, jint androidVersion, jboolean debug, j
             ScopedLocalClassRef Method(env, "java/lang/reflect/Method");
             jmethodID getAccessFlags = Method.FindMethodID("getAccessFlags", "()I");
             if (LIKELY(getAccessFlags != nullptr)) {
-                ScopedLocalRef javaM1(env, env->ToReflectedMethod(
-                        Ruler.Get(), m1->ToMethodID(), JNI_TRUE));
-                expected_access_flags = static_cast<uint32_t>(env->CallIntMethod(
-                        javaM1.Get(), getAccessFlags));
+                ScopedLocalRef javaM1(env, env->ToReflectedMethod(Ruler.Get(), m1->ToMethodID(),
+                                                                  JNI_TRUE));
+                expected_access_flags = static_cast<uint32_t>(env->CallIntMethod(javaM1.Get(),
+                                                                                 getAccessFlags));
 
                 if (LIKELY(!env->ExceptionCheck())) break;
 
@@ -98,7 +101,8 @@ void Pine_init0(JNIEnv* env, jclass Pine, jint androidVersion, jboolean debug, j
             } else {
                 LOGW("Method.getAccessFlags not found, use default access flags.");
             }
-            expected_access_flags = AccessFlags::kPrivate | AccessFlags::kStatic | AccessFlags::kNative;
+            expected_access_flags =
+                    AccessFlags::kPrivate | AccessFlags::kStatic | AccessFlags::kNative;
         } while (false);
 
         if (androidVersion >= Android::kQ) {
@@ -120,7 +124,7 @@ void Pine_init0(JNIEnv* env, jclass Pine, jint androidVersion, jboolean debug, j
 
             LOGE("art_quick_to_interpreter_bridge not found, try workaround");
 
-            void* entry = abstract_method->GetEntryPointFromCompiledCode();
+            void *entry = abstract_method->GetEntryPointFromCompiledCode();
             LOGE("New art_quick_to_interpreter_bridge %p", entry);
             art::ArtMethod::SetQuickToInterpreterBridge(entry);
         }
@@ -137,9 +141,9 @@ else env->SetStaticLongField(Pine, field, (value));
 #undef SET_JAVA_VALUE
 }
 
-jobject Pine_hook0(JNIEnv* env, jclass, jlong threadAddress, jclass declaring, jobject javaTarget,
-            jobject javaBridge, jboolean isInlineHook, jboolean isJni, jboolean isProxy) {
-    auto thread = reinterpret_cast<art::Thread*>(threadAddress);
+jobject Pine_hook0(JNIEnv *env, jclass, jlong threadAddress, jclass declaring, jobject javaTarget,
+                   jobject javaBridge, jboolean isInlineHook, jboolean isJni, jboolean isProxy) {
+    auto thread = reinterpret_cast<art::Thread *>(threadAddress);
     auto target = art::ArtMethod::FromReflectedMethod(env, javaTarget);
     auto bridge = art::ArtMethod::FromReflectedMethod(env, javaBridge);
 
@@ -155,7 +159,8 @@ jobject Pine_hook0(JNIEnv* env, jclass, jlong threadAddress, jclass declaring, j
     const bool is_proxy = JBOOL_TRUE(isProxy);
     const bool is_native_or_proxy = is_native || is_proxy;
 
-    TrampolineInstaller* trampoline_installer = TrampolineInstaller::GetDefault();
+    // 创建跳板
+    TrampolineInstaller *trampoline_installer = TrampolineInstaller::GetDefault();
 
     if (UNLIKELY(is_inline_hook && trampoline_installer->IsReplacementOnly())) {
         is_inline_hook = false;
@@ -167,14 +172,15 @@ jobject Pine_hook0(JNIEnv* env, jclass, jlong threadAddress, jclass declaring, j
     }
 
     bool skip_first_few_bytes = PineConfig::anti_checks
-            && is_inline_hook && trampoline_installer->CanSkipFirstFewBytes(target);
+                                && is_inline_hook &&
+                                trampoline_installer->CanSkipFirstFewBytes(target);
 
-    art::ArtMethod* backup;
+    art::ArtMethod *backup;
     if (WellKnownClasses::java_lang_reflect_ArtMethod) {
         // If ArtMethod has mirror class in java, we cannot use malloc to direct
         // allocate a instance because it must has a record in Runtime.
 
-        backup = static_cast<art::ArtMethod*>(thread->AllocNonMovable(
+        backup = static_cast<art::ArtMethod *>(thread->AllocNonMovable(
                 WellKnownClasses::java_lang_reflect_ArtMethod));
         if (UNLIKELY(!backup)) {
             // On Android kitkat, moving gc is not supported in art. All objects are immovable.
@@ -188,7 +194,7 @@ jobject Pine_hook0(JNIEnv* env, jclass, jlong threadAddress, jclass declaring, j
                 LOGE("Can't create the backup method!");
                 return nullptr;
             }
-            backup = static_cast<art::ArtMethod*>(thread->DecodeJObject(javaBackup));
+            backup = static_cast<art::ArtMethod *>(thread->DecodeJObject(javaBackup));
         }
     } else {
         backup = art::ArtMethod::New();
@@ -210,12 +216,15 @@ jobject Pine_hook0(JNIEnv* env, jclass, jlong threadAddress, jclass declaring, j
     char error_msg[288];
 
     {
+        // 替换跳板
         // An ArtMethod is a very important object. Many threads depend on their values,
         // so we need to suspend other threads to avoid errors when hooking.
         ScopedSuspendVM suspend_vm(thread);
 
-        void* call_origin = is_inline_hook
-                            ? trampoline_installer->InstallInlineTrampoline(target, bridge, skip_first_few_bytes)
+        // 跳板信息
+        void *call_origin = is_inline_hook
+                            ? trampoline_installer->InstallInlineTrampoline(target, bridge,
+                                                                            skip_first_few_bytes)
                             : trampoline_installer->InstallReplacementTrampoline(target, bridge);
 
         if (LIKELY(call_origin)) {
@@ -223,10 +232,13 @@ jobject Pine_hook0(JNIEnv* env, jclass, jlong threadAddress, jclass declaring, j
             target->AfterHook(is_inline_hook, is_native_or_proxy);
             success = true;
         } else {
-            snprintf(error_msg, sizeof(error_msg), "Failed to install %s trampoline on method %p: %s (%d).",
+            snprintf(error_msg, sizeof(error_msg),
+                     "Failed to install %s trampoline on method %p: %s (%d).",
                      is_inline_hook ? "inline" : "replacement", target, strerror(errno), errno);
             if (errno == EACCES || errno == EPERM)
-                strlcat(error_msg, " This is a security failure, check selinux policy, seccomp or capabilities. Earlier log may point out root cause.", sizeof(error_msg));
+                strlcat(error_msg,
+                        " This is a security failure, check selinux policy, seccomp or capabilities. Earlier log may point out root cause.",
+                        sizeof(error_msg));
             LOGE("%s", error_msg);
             success = false;
         }
@@ -236,58 +248,64 @@ jobject Pine_hook0(JNIEnv* env, jclass, jlong threadAddress, jclass declaring, j
         return env->ToReflectedMethod(declaring, backup->ToMethodID(),
                                       static_cast<jboolean>(backup->IsStatic()));
     } else {
-        JNIHelper::Throw(env, errno == EACCES || errno == EPERM ? "java/lang/SecurityException" : "java/lang/RuntimeException", error_msg);
+        JNIHelper::Throw(env, errno == EACCES || errno == EPERM ? "java/lang/SecurityException"
+                                                                : "java/lang/RuntimeException",
+                         error_msg);
         return nullptr;
     }
 }
 
-jlong Pine_getArtMethod(JNIEnv* env, jclass, jobject javaMethod) {
+jlong Pine_getArtMethod(JNIEnv *env, jclass, jobject javaMethod) {
     return static_cast<jlong>(reinterpret_cast<intptr_t>(
             art::ArtMethod::FromReflectedMethod(env, javaMethod)));
 }
 
-jboolean Pine_compile0(JNIEnv* env, jclass, jlong thread, jobject javaMethod) {
+jboolean Pine_compile0(JNIEnv *env, jclass, jlong thread, jobject javaMethod) {
     return static_cast<jboolean>(art::ArtMethod::FromReflectedMethod(env, javaMethod)->Compile(
-            reinterpret_cast<art::Thread*>(thread)));
+            reinterpret_cast<art::Thread *>(thread)));
 }
 
-jboolean Pine_decompile0(JNIEnv* env, jclass, jobject javaMethod, jboolean disableJit) {
+jboolean Pine_decompile0(JNIEnv *env, jclass, jobject javaMethod, jboolean disableJit) {
     return static_cast<jboolean>(art::ArtMethod::FromReflectedMethod(env, javaMethod)->Decompile(
             disableJit));
 }
 
-jboolean Pine_disableJitInline0(JNIEnv*, jclass) {
+jboolean Pine_disableJitInline0(JNIEnv *, jclass) {
     return static_cast<jboolean>(art::Jit::DisableInline());
 }
 
-void Pine_setJitCompilationAllowed(JNIEnv*, jclass, jboolean allowed) {
+void Pine_setJitCompilationAllowed(JNIEnv *, jclass, jboolean allowed) {
     PineConfig::jit_compilation_allowed = allowed;
 }
 
-jboolean Pine_disableProfileSaver0(JNIEnv*, jclass) {
+jboolean Pine_disableProfileSaver0(JNIEnv *, jclass) {
     return static_cast<jboolean>(Android::DisableProfileSaver());
 }
 
-jobject Pine_getObject0(JNIEnv* env, jclass, jlong thread, jlong address) {
-    return reinterpret_cast<art::Thread*>(thread)->AddLocalRef(env, reinterpret_cast<Object*>(address));
+jobject Pine_getObject0(JNIEnv *env, jclass, jlong thread, jlong address) {
+    return reinterpret_cast<art::Thread *>(thread)->AddLocalRef(env,
+                                                                reinterpret_cast<Object *>(address));
 }
 
-jlong Pine_getAddress0(JNIEnv*, jclass, jlong thread, jobject o) {
-    return reinterpret_cast<jlong>(reinterpret_cast<art::Thread*>(thread)->DecodeJObject(o));
+jlong Pine_getAddress0(JNIEnv *, jclass, jlong thread, jobject o) {
+    return reinterpret_cast<jlong>(reinterpret_cast<art::Thread *>(thread)->DecodeJObject(o));
 }
 
 #ifdef __aarch64__
-void Pine_getArgsArm64(JNIEnv* env, jclass, jlong javaExtras, jlong sp, jbooleanArray typeWides,
-        jlongArray coreRegisters, jlongArray stack, jdoubleArray fpRegisters) {
-    auto extras = reinterpret_cast<Extras*>(javaExtras);
+
+void Pine_getArgsArm64(JNIEnv *env, jclass, jlong javaExtras, jlong sp, jbooleanArray typeWides,
+                       jlongArray coreRegisters, jlongArray stack, jdoubleArray fpRegisters) {
+    auto extras = reinterpret_cast<Extras *>(javaExtras);
     jint total = env->GetArrayLength(typeWides);
     jint crLength = env->GetArrayLength(coreRegisters);
     jint stackLength = env->GetArrayLength(stack);
 
     if (LIKELY(total != 0)) {
-        jboolean* wides = static_cast<jboolean*>(env->GetPrimitiveArrayCritical(typeWides, nullptr));
+        jboolean *wides = static_cast<jboolean *>(env->GetPrimitiveArrayCritical(typeWides,
+                                                                                 nullptr));
         if (LIKELY(crLength > 0)) {
-            jlong* array = static_cast<jlong*>(env->GetPrimitiveArrayCritical(coreRegisters, nullptr));
+            jlong *array = static_cast<jlong *>(env->GetPrimitiveArrayCritical(coreRegisters,
+                                                                               nullptr));
 
             do {
                 array[0] = reinterpret_cast<jlong>(extras->r1);
@@ -304,9 +322,9 @@ void Pine_getArgsArm64(JNIEnv* env, jclass, jlong javaExtras, jlong sp, jboolean
             // get args from stack
             uintptr_t current_on_stack = static_cast<uintptr_t>(sp + 8/*callee*/);
 
-            jlong* array = static_cast<jlong*>(env->GetPrimitiveArrayCritical(stack, nullptr));
+            jlong *array = static_cast<jlong *>(env->GetPrimitiveArrayCritical(stack, nullptr));
             for (int i = 0; i < stackLength; ++i) {
-                array[i] = *reinterpret_cast<jlong*>(current_on_stack);
+                array[i] = *reinterpret_cast<jlong *>(current_on_stack);
                 current_on_stack += wides[i] == JNI_TRUE ? 8 : 4;
             }
             env->ReleasePrimitiveArrayCritical(stack, array, JNI_ABORT);
@@ -324,6 +342,7 @@ void Pine_getArgsArm64(JNIEnv* env, jclass, jlong javaExtras, jlong sp, jboolean
     }
     delete extras;
 }
+
 #elif defined(__arm__)
 void Pine_getArgsArm32(JNIEnv *env, jclass, jint javaExtras, jint sp,
                        jintArray crOut, jintArray stack, jfloatArray fpOut) {
@@ -396,7 +415,7 @@ void Pine_getArgsX86(JNIEnv* env, jclass, jint javaExtras, jintArray javaArray, 
 }
 #endif
 
-void Pine_syncMethodInfo(JNIEnv* env, jclass, jobject javaOrigin, jobject javaBackup) {
+void Pine_syncMethodInfo(JNIEnv *env, jclass, jobject javaOrigin, jobject javaBackup) {
     auto origin = art::ArtMethod::FromReflectedMethod(env, javaOrigin);
     auto backup = art::ArtMethod::FromReflectedMethod(env, javaBackup);
 
@@ -413,8 +432,8 @@ void Pine_syncMethodInfo(JNIEnv* env, jclass, jobject javaOrigin, jobject javaBa
     // JNI method entry might be changed by RegisterNatives or UnregisterNatives
     // Use backup to check native as we may add kNative to access flags of origin (Android 8.0+ with debuggable mode)
     if (backup->IsNative()) {
-        void* previous = backup->GetEntryPointFromJni();
-        void* current = origin->GetEntryPointFromJni();
+        void *previous = backup->GetEntryPointFromJni();
+        void *current = origin->GetEntryPointFromJni();
         if (current != previous) {
             LOGI("Native entry of method %p was changed, also update in backup %p", origin, backup);
             backup->SetEntryPointFromJni(current);
@@ -422,29 +441,29 @@ void Pine_syncMethodInfo(JNIEnv* env, jclass, jobject javaOrigin, jobject javaBa
     }
 }
 
-void Pine_setDebuggable(JNIEnv*, jclass, jboolean debuggable) {
+void Pine_setDebuggable(JNIEnv *, jclass, jboolean debuggable) {
     PineConfig::debuggable = static_cast<bool>(debuggable);
 }
 
-void Pine_disableHiddenApiPolicy0(JNIEnv*, jclass, jboolean application, jboolean platform) {
+void Pine_disableHiddenApiPolicy0(JNIEnv *, jclass, jboolean application, jboolean platform) {
     Android::DisableHiddenApiPolicy(application, platform);
 }
 
-jlong Pine_currentArtThread0(JNIEnv* env, jclass) {
+jlong Pine_currentArtThread0(JNIEnv *env, jclass) {
     return reinterpret_cast<jlong>(art::Thread::Current(env));
 }
 
-void Pine_makeClassesVisiblyInitialized(JNIEnv*, jclass, jlong thread) {
-    Android::MakeInitializedClassesVisiblyInitialized(reinterpret_cast<void*>(thread), true);
+void Pine_makeClassesVisiblyInitialized(JNIEnv *, jclass, jlong thread) {
+    Android::MakeInitializedClassesVisiblyInitialized(reinterpret_cast<void *>(thread), true);
 }
 
-jlong Pine_cloneExtras(JNIEnv*, jclass, jlong extras) {
-    return reinterpret_cast<jlong>(reinterpret_cast<Extras*>(extras)->CloneAndUnlock());
+jlong Pine_cloneExtras(JNIEnv *, jclass, jlong extras) {
+    return reinterpret_cast<jlong>(reinterpret_cast<Extras *>(extras)->CloneAndUnlock());
 }
 
 static const struct {
-    const char* name;
-    const char* signature;
+    const char *name;
+    const char *signature;
 } gFastNativeMethods[] = {
         {"getArtMethod", "(Ljava/lang/reflect/Member;)J"},
         {"syncMethodInfo", "(Ljava/lang/reflect/Member;Ljava/lang/reflect/Method;)V"},
@@ -467,35 +486,39 @@ static const struct {
 #endif
 };
 
-void Pine_enableFastNative(JNIEnv* env, jclass Pine) {
+void Pine_enableFastNative(JNIEnv *env, jclass Pine) {
     LOGI("Experimental feature FastNative is enabled.");
-    for (auto& method_info : gFastNativeMethods) {
-        auto method = art::ArtMethod::Require(env, Pine, method_info.name, method_info.signature, true);
+    for (auto &method_info: gFastNativeMethods) {
+        auto method = art::ArtMethod::Require(env, Pine, method_info.name, method_info.signature,
+                                              true);
         assert(method != nullptr);
         method->SetFastNative();
     }
 }
 
 static const JNINativeMethod gMethods[] = {
-        {"init0", "(IZZZZZ)V", (void*) Pine_init0},
-        {"enableFastNative", "()V", (void*) Pine_enableFastNative},
-        {"getArtMethod", "(Ljava/lang/reflect/Member;)J", (void*) Pine_getArtMethod},
-        {"hook0", "(JLjava/lang/Class;Ljava/lang/reflect/Member;Ljava/lang/reflect/Method;ZZZ)Ljava/lang/reflect/Method;", (void*) Pine_hook0},
-        {"compile0", "(JLjava/lang/reflect/Member;)Z", (void*) Pine_compile0},
-        {"decompile0", "(Ljava/lang/reflect/Member;Z)Z", (void*) Pine_decompile0},
-        {"disableJitInline0", "()Z", (void*) Pine_disableJitInline0},
-        {"setJitCompilationAllowed0", "(Z)V", (void*) Pine_setJitCompilationAllowed},
-        {"disableProfileSaver0", "()Z", (void*) Pine_disableProfileSaver0},
-        {"syncMethodInfo", "(Ljava/lang/reflect/Member;Ljava/lang/reflect/Method;)V", (void*) Pine_syncMethodInfo},
-        {"getObject0", "(JJ)Ljava/lang/Object;", (void*) Pine_getObject0},
-        {"getAddress0", "(JLjava/lang/Object;)J", (void*) Pine_getAddress0},
-        {"setDebuggable0", "(Z)V", (void*) Pine_setDebuggable},
-        {"disableHiddenApiPolicy0", "(ZZ)V", (void*) Pine_disableHiddenApiPolicy0},
-        {"currentArtThread0", "()J", (void*) Pine_currentArtThread0},
-        {"makeClassesVisiblyInitialized", "(J)V", (void*) Pine_makeClassesVisiblyInitialized},
-        {"cloneExtras", "(J)J", (void*) Pine_cloneExtras},
+        {"init0", "(IZZZZZ)V", (void *) Pine_init0},
+        {"enableFastNative", "()V", (void *) Pine_enableFastNative},
+        {"getArtMethod", "(Ljava/lang/reflect/Member;)J", (void *) Pine_getArtMethod},
+        {"hook0",
+         "(JLjava/lang/Class;Ljava/lang/reflect/Member;Ljava/lang/reflect/Method;ZZZ)Ljava/lang/reflect/Method;",
+         (void *) Pine_hook0},
+        {"compile0", "(JLjava/lang/reflect/Member;)Z", (void *) Pine_compile0},
+        {"decompile0", "(Ljava/lang/reflect/Member;Z)Z", (void *) Pine_decompile0},
+        {"disableJitInline0", "()Z", (void *) Pine_disableJitInline0},
+        {"setJitCompilationAllowed0", "(Z)V", (void *) Pine_setJitCompilationAllowed},
+        {"disableProfileSaver0", "()Z", (void *) Pine_disableProfileSaver0},
+        {"syncMethodInfo", "(Ljava/lang/reflect/Member;Ljava/lang/reflect/Method;)V",
+         (void *) Pine_syncMethodInfo},
+        {"getObject0", "(JJ)Ljava/lang/Object;", (void *) Pine_getObject0},
+        {"getAddress0", "(JLjava/lang/Object;)J", (void *) Pine_getAddress0},
+        {"setDebuggable0", "(Z)V", (void *) Pine_setDebuggable},
+        {"disableHiddenApiPolicy0", "(ZZ)V", (void *) Pine_disableHiddenApiPolicy0},
+        {"currentArtThread0", "()J", (void *) Pine_currentArtThread0},
+        {"makeClassesVisiblyInitialized", "(J)V", (void *) Pine_makeClassesVisiblyInitialized},
+        {"cloneExtras", "(J)J", (void *) Pine_cloneExtras},
 #ifdef __aarch64__
-        {"getArgsArm64", "(JJ[Z[J[J[D)V", (void*) Pine_getArgsArm64}
+        {"getArgsArm64", "(JJ[Z[J[J[D)V", (void *) Pine_getArgsArm64}
 #elif defined(__arm__)
         {"getArgsArm32", "(II[I[I[F)V", (void*) Pine_getArgsArm32}
 #elif defined(__i386__)
@@ -503,6 +526,6 @@ static const JNINativeMethod gMethods[] = {
 #endif
 };
 
-bool register_Pine(JNIEnv* env, jclass Pine) {
+bool register_Pine(JNIEnv *env, jclass Pine) {
     return LIKELY(env->RegisterNatives(Pine, gMethods, NELEM(gMethods)) == JNI_OK);
 }

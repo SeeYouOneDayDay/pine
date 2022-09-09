@@ -12,12 +12,12 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import top.canyie.pine.callback.MethodHook;
+import top.canyie.pine.utils.Utils;
 
 /**
  * The bridge class provides main APIs for you.
@@ -32,6 +32,7 @@ public final class Pine {
     private static final int ARCH_X86 = 3;
     private static volatile boolean initialized;
     private static final Map<String, Method> sBridgeMethods = new HashMap<>(8, 2f);
+    //artmethod地址:方法详情
     private static final Map<Long, HookRecord> sHookRecords = new ConcurrentHashMap<>();
     private static final Object sHookLock = new Object();
     private static int arch;
@@ -40,9 +41,10 @@ public final class Pine {
         @Override
         public MethodHook.Unhook handleHook(HookRecord hookRecord, MethodHook hook, int modifiers,
                                             boolean newMethod, boolean canInitDeclaringClass) {
-            if (newMethod)
+            if (newMethod) {
+                // 还未操作的新办法,进行hook
                 hookNewMethod(hookRecord, modifiers, canInitDeclaringClass);
-
+            }
             if (hook == null) {
                 // This can only happens when the up handler pass null manually,
                 // just return null and let the up to do remaining everything
@@ -62,6 +64,49 @@ public final class Pine {
 
     /** Internal API, used by enhances library. DO NOT USE IT. */
     public static long openElf, findElfSymbol, closeElf;
+
+    private static native void init0(int androidVersion, boolean debug, boolean debuggable,
+                                     boolean antiChecks, boolean disableHiddenApiPolicy,
+                                     boolean disableHiddenApiPolicyForPlatformDomain);
+
+    private static native void enableFastNative();
+
+    public static native long getArtMethod(Member method);
+
+    private static native Method hook0(long thread, Class<?> declaring, Member target, Method bridge,
+                                       boolean isInlineHook, boolean jni, boolean proxy);
+
+    private static native boolean compile0(long thread, Member method);
+
+    private static native boolean decompile0(Member method, boolean disableJit);
+
+    private static native boolean disableJitInline0();
+
+    private static native void setJitCompilationAllowed0(boolean allowed);
+
+    private static native boolean disableProfileSaver0();
+
+    private static native Object getObject0(long thread, long address);
+
+    private static native long getAddress0(long thread, Object o);
+
+    public static native void getArgsArm32(int extras, int sp, int[] crOut, int[] stack, float[] fpOut);
+
+    public static native void getArgsArm64(long extras, long sp, boolean[] typeWides, long[] crOut, long[] stack, double[] fpOut);
+
+    public static native void getArgsX86(int extras, int[] out, int ebx);
+
+    private static native void syncMethodInfo(Member origin, Method backup);
+
+    public static native long currentArtThread0();
+
+    private static native void setDebuggable0(boolean debuggable);
+
+    private static native void disableHiddenApiPolicy0(boolean application, boolean platform);
+
+    private static native void makeClassesVisiblyInitialized(long thread);
+
+    public static native long cloneExtras(long origin);
 
     private Pine() {
         throw new RuntimeException("Use static methods");
@@ -87,44 +132,33 @@ public final class Pine {
         return initialized;
     }
 
-    // https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:core/core/src/main/java/androidx/core/os/BuildCompat.java;l=49;drc=f8ab4c3030c3fbadca32a9593c522c89a9f2cadf
-    private static boolean isAtLeastPreReleaseCodename(String codename) {
-        final String buildCodename = Build.VERSION.CODENAME.toUpperCase(Locale.ROOT);
 
-        // Special case "REL", which means the build is not a pre-release build.
-        if ("REL".equals(buildCodename)) {
-            return false;
+    public static boolean isArt() {
+        try {
+            return System.getProperty("java.vm.version").startsWith("2");
+        } catch (Throwable e) {
+            log(e);
         }
-
-        return buildCodename.compareTo(codename.toUpperCase(Locale.ROOT)) >= 0;
+        return false;
     }
 
     @SuppressLint("ObsoleteSdkInt")
     private static void initialize() {
+        //process preview version
         int sdkLevel = PineConfig.sdkLevel;
-        if (sdkLevel < Build.VERSION_CODES.KITKAT)
-            throw new RuntimeException("Unsupported android sdk level " + sdkLevel);
-        else if (sdkLevel > Build.VERSION_CODES.R) {
-            Log.w(TAG, "Android version too high, not tested now...");
-            if (sdkLevel >= Build.VERSION_CODES.S_V2 && isAtLeastPreReleaseCodename("Tiramisu")) {
-                // Android 13 (Tiramisu) Preview
-                sdkLevel = Build.VERSION_CODES.S_V2 + 1;
-            } else if (sdkLevel == Build.VERSION_CODES.S && isAtLeastPreReleaseCodename("Sv2")) {
-                // Android 12.1 (SL) Preview
-                sdkLevel = Build.VERSION_CODES.S_V2;
-            }
-        }
 
-        String vmVersion = System.getProperty("java.vm.version");
-        if (vmVersion == null || !vmVersion.startsWith("2"))
+        if (!isArt()) {
             throw new RuntimeException("Only supports ART runtime");
-
+        }
         try {
-            LibLoader libLoader = PineConfig.libLoader;
-            if (libLoader != null) libLoader.loadLib();
+            // already instance. must not null
+            PineConfig.libLoader.loadLib();
 
+            // 初始化pine库
             init0(sdkLevel, PineConfig.debug, PineConfig.debuggable, PineConfig.antiChecks,
                     PineConfig.disableHiddenApiPolicy, PineConfig.disableHiddenApiPolicyForPlatformDomain);
+
+            // 桥接方法
             initBridgeMethods();
 
             if (PineConfig.useFastNative && sdkLevel >= Build.VERSION_CODES.LOLLIPOP)
@@ -259,25 +293,26 @@ public final class Pine {
      * @throws IllegalArgumentException If {@code method} cannot be hooked, such as abstract method.
      */
     public static MethodHook.Unhook hook(Member method, MethodHook callback, boolean canInitDeclaringClass) {
-        if (PineConfig.debug)
-            Log.d(TAG, "Hooking method " + method + " with callback " + callback);
+        Pine.log("Hooking method " + method + " with callback " + callback);
 
         if (method == null) throw new NullPointerException("method == null");
         if (callback == null) throw new NullPointerException("callback == null");
 
         int modifiers = method.getModifiers();
         if (method instanceof Method) {
+            // 不能hook抽象方法，是否有方式hook呢？
             if (Modifier.isAbstract(modifiers))
                 throw new IllegalArgumentException("Cannot hook abstract methods: " + method);
             ((Method) method).setAccessible(true);
         } else if (method instanceof Constructor) {
-            if (Modifier.isStatic(modifiers)) // TODO: We really cannot hook this?
+            if (Modifier.isStatic(modifiers)) // TODO: We really cannot hook this? static在高版本懒加载 && 构造函数如何静态？
                 throw new IllegalArgumentException("Cannot hook class initializer: " + method);
             ((Constructor<?>) method).setAccessible(true);
         } else {
             throw new IllegalArgumentException("Only methods and constructors can be hooked: " + method);
         }
 
+        // 初始化sdk版本, pine库相关、桥接函数列表
         ensureInitialized();
 
         HookListener hookListener = sHookListener;
@@ -285,6 +320,8 @@ public final class Pine {
         if (hookListener != null)
             hookListener.beforeHook(method, callback);
 
+        // >30 java_lang_reflect_Executable_artMethod方式获取
+        // 否则通过访问  ArtMethod* FromReflectedMethod
         long artMethod = getArtMethod(method);
         HookRecord hookRecord;
         boolean newMethod = false;
@@ -293,11 +330,12 @@ public final class Pine {
             hookRecord = sHookRecords.get(artMethod);
             if (hookRecord == null) {
                 newMethod = true;
+                //方法备份及详情
                 hookRecord = new HookRecord(method, artMethod);
                 sHookRecords.put(artMethod, hookRecord);
             }
         }
-
+        // 如果是新的，则进行hook
         MethodHook.Unhook unhook = sHookHandler.handleHook(hookRecord, callback, modifiers,
                 newMethod, canInitDeclaringClass);
 
@@ -307,7 +345,9 @@ public final class Pine {
         return unhook;
     }
 
+    // 被hook以后得缓存handler 调用
     static void hookNewMethod(HookRecord hookRecord, int modifiers, boolean canInitDeclaringClass) {
+        Pine.debug(Log.getStackTraceString(new Exception("-----堆栈hookNewMethod------")));
         Member method = hookRecord.target;
         boolean isInlineHook;
         if (hookMode == HookMode.AUTO) {
@@ -315,17 +355,16 @@ public final class Pine {
             // (sharpening optimization), entry replacement will most likely not take effect,
             // so we prefer to use inline hook; And on Android O+, this optimization is not performed,
             // so we prefer a more stable entry replacement mode.
-
             isInlineHook = PineConfig.sdkLevel < Build.VERSION_CODES.O;
         } else {
             isInlineHook = hookMode == HookMode.INLINE;
         }
 
-
-//        Thread.currentThread()-- address?
-        //nativePeer ?
-        // @todo
         long thread = currentArtThread0();
+        // 可以测试
+        long nativePeer = Utils.getThreadPeer();
+        Pine.log("thread nativePeer:" + thread + "___" + nativePeer + "---->" + (thread == nativePeer));
+
         if ((hookRecord.isStatic = Modifier.isStatic(modifiers)) && canInitDeclaringClass) {
             resolve((Method) method);
             if (PineConfig.sdkLevel >= Build.VERSION_CODES.Q) {
@@ -339,6 +378,7 @@ public final class Pine {
             }
         }
 
+        // 获取所在类
         Class<?> declaring = method.getDeclaringClass();
 
         final boolean jni = Modifier.isNative(modifiers);
@@ -371,12 +411,23 @@ public final class Pine {
 
         hookRecord.paramNumber = hookRecord.paramTypes.length;
 
+
         Method bridge = sBridgeMethods.get(bridgeMethodName);
+
         if (bridge == null)
             throw new AssertionError("Cannot find bridge method for " + method);
 
+        // 替换方法
         Method backup = hook0(thread, declaring, method, bridge, isInlineHook, jni, proxy);
 
+        Pine.log("hookNewMethod", "-----------方法地址测试-----------"
+                + "\r\n\tmethod:" + method
+                + "\r\n\tmethod address:" + Utils.getMethodAddress(method)
+                + "\r\n\tbridge:" + bridge
+                + "\r\n\tbridge address:" + Utils.getMethodAddress(bridge)
+                + "\r\n\tbackup:" + backup
+                + "\r\n\tbackup address:" + Utils.getMethodAddress(backup)
+        );
         if (backup == null)
             throw new RuntimeException("Failed to hook method " + method);
 
@@ -386,6 +437,7 @@ public final class Pine {
 
     private static void resolve(Method method) {
         Object[] badArgs;
+        // 有参数时，invoke的时候不带参数？
         if (method.getParameterTypes().length > 0) {
             badArgs = null;
         } else {
@@ -713,70 +765,38 @@ public final class Pine {
             return callFrame.getResult();
     }
 
-    /**
-     * Print a log with "Pine" tag if {@code PineConfig#debug} is set, or do nothing.
-     * @param message The message you want print.
-     */
+    public static void debug(String message) {
+        println(Log.DEBUG, TAG, message);
+    }
+
     public static void log(String message) {
-        if (PineConfig.debug) {
-            Log.i(TAG, message);
-        }
+        println(Log.INFO, TAG, message);
     }
 
-    /**
-     * Print a log with "Pine" tag if {@code PineConfig#debug} is set, or do nothing.
-     * @param fmt The message format you want print.
-     * @param args The args used to format {@code format}.
-     * @see String#format(String, Object...)
-     */
+    public static void log(String tag, String message) {
+        println(Log.INFO, TAG + "." + tag, message);
+    }
+
+    public static void log(Throwable e) {
+        println(Log.ERROR, TAG, Log.getStackTraceString(e));
+    }
+
+    public static void warn(String msg) {
+        println(Log.WARN, TAG, msg);
+    }
+
     public static void log(String fmt, Object... args) {
-        if (PineConfig.debug) {
-            Log.i(TAG, String.format(fmt, args));
-        }
+        println(Log.INFO, TAG, String.format(fmt, args));
     }
 
-    private static native void init0(int androidVersion, boolean debug, boolean debuggable,
-                                     boolean antiChecks, boolean disableHiddenApiPolicy,
-                                     boolean disableHiddenApiPolicyForPlatformDomain);
+    public static int println(int priority, String tag, String msg) {
+        if (PineConfig.debug) {
+            return Log.println(priority, tag, msg);
+        }
+        return 0;
+    }
 
-    private static native void enableFastNative();
 
-    public static native long getArtMethod(Member method);
-
-    private static native Method hook0(long thread, Class<?> declaring, Member target, Method bridge,
-                                       boolean isInlineHook, boolean jni, boolean proxy);
-
-    private static native boolean compile0(long thread, Member method);
-
-    private static native boolean decompile0(Member method, boolean disableJit);
-
-    private static native boolean disableJitInline0();
-
-    private static native void setJitCompilationAllowed0(boolean allowed);
-
-    private static native boolean disableProfileSaver0();
-
-    private static native Object getObject0(long thread, long address);
-
-    private static native long getAddress0(long thread, Object o);
-
-    public static native void getArgsArm32(int extras, int sp, int[] crOut, int[] stack, float[] fpOut);
-
-    public static native void getArgsArm64(long extras, long sp, boolean[] typeWides, long[] crOut, long[] stack, double[] fpOut);
-
-    public static native void getArgsX86(int extras, int[] out, int ebx);
-
-    private static native void syncMethodInfo(Member origin, Method backup);
-
-    public static native long currentArtThread0();
-
-    private static native void setDebuggable0(boolean debuggable);
-
-    private static native void disableHiddenApiPolicy0(boolean application, boolean platform);
-
-    private static native void makeClassesVisiblyInitialized(long thread);
-
-    public static native long cloneExtras(long origin);
 
     /**
      * Interface definition for a callback to be invoked when a method is hooked.

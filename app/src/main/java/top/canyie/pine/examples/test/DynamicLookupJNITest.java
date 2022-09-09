@@ -1,5 +1,7 @@
 package top.canyie.pine.examples.test;
 
+import android.util.Log;
+
 import java.util.Random;
 
 /**
@@ -16,6 +18,7 @@ public class DynamicLookupJNITest extends Test {
 
     @Override protected int testImpl() {
         int i = new Random().nextInt();
+        Log.e("Pine.demo","testImpl---"+i);
         return target(i) == i * i ? SUCCESS : FAILED;
     }
 

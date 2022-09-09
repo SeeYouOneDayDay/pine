@@ -13,13 +13,13 @@ Pine是一个在虚拟机层面、以Java方法为粒度的运行时动态hook�
 
 ### 基础使用
 在 build.gradle 中添加如下依赖：
-```groovy
+``` groovy
 dependencies {
     implementation 'top.canyie.pine:core:<version>'
 }
 ```
 配置一些基础信息：
-```java
+``` java
 PineConfig.debug = true; // 是否debug，true会输出较详细log
 PineConfig.debuggable = BuildConfig.DEBUG; // 该应用是否可调试，建议和配置文件中的值保持一致，否则会出现问题
 ```
@@ -28,7 +28,7 @@ PineConfig.debuggable = BuildConfig.DEBUG; // 该应用是否可调试，建议�
 几个例子：
 
 例子1：监控Activity onCreate（注：仅做测试使用，如果你真的有这个需求更建议使用`registerActivityLifecycleCallbacks()`等接口）
-```java
+``` java
 Pine.hook(Activity.class.getDeclaredMethod("onCreate", Bundle.class), new MethodHook() {
     @Override public void beforeCall(Pine.CallFrame callFrame) {
         Log.i(TAG, "Before " + callFrame.thisObject + " onCreate()");
@@ -43,7 +43,7 @@ Pine.hook(Activity.class.getDeclaredMethod("onCreate", Bundle.class), new Method
 Pine.CallFrame就相当于Xposed的MethodHookParams。
 
 例子2：拦截所有java线程的创建与销毁：
-```java
+``` java
 final MethodHook runHook = new MethodHook() {
     @Override public void beforeCall(Pine.CallFrame callFrame) throws Throwable {
         Log.i(TAG, "Thread " + callFrame.thisObject + " started...");
@@ -62,7 +62,7 @@ Pine.hook(Thread.class.getDeclaredMethod("start"), new MethodHook() {
 ```
 
 例子3：允许任何线程更改UI（注：绝对不建议在任何APP中使用）：
-```java
+``` java
 Method checkThread = Class.forName("android.view.ViewRootImpl").getDeclaredMethod("checkThread");
 Pine.hook(checkThread, MethodReplacement.DO_NOTHING);
 ```
@@ -73,13 +73,13 @@ Pine.hook(checkThread, MethodReplacement.DO_NOTHING);
 Pine支持以Xposed风格hook方法和加载Xposed模块（注：目前不支持资源hook等）。
 
 添加依赖：
-```groovy
+``` groovy
 implementation 'top.canyie.pine:xposed:<version>'
 ```
 （注：Xposed支持需要依赖core）
 
 然后你可以直接以Xposed风格hook方法：
-```java
+``` java
 XposedHelpers.findAndHookMethod(TextView.class, "setText",
                 CharSequence.class, TextView.BufferType.class, boolean.class, int.class,
                 new XC_MethodHook() {
@@ -96,12 +96,12 @@ XposedHelpers.findAndHookMethod(TextView.class, "setText",
                 });
 ```
 也可以使用:
-```java
+``` java
 XposedBridge.hookMethod(target, callback);
 ```
 
 也可以直接加载Xposed模块：
-```java
+``` java
 // 1. load modules
 PineXposed.loadModule(new File(modulePath));
 
@@ -113,12 +113,12 @@ PineXposed.onPackageLoad(packageName, processName, appInfo, isFirstApp, classLoa
 [![Download](https://img.shields.io/maven-central/v/top.canyie.pine/enhances.svg)](https://repo1.maven.org/maven2/top/canyie/pine/enhances/)
 
 借助[Dobby](https://github.com/jmpews/Dobby), 你可以使用一些增强功能:
-```groovy
+``` groovy
 implementation 'top.canyie.pine:enhances:<version>'
 ```
 
 - Delay hook (也称为pending hook), hook静态方法无需立刻初始化它所在的类，只需要加入以下代码:
-```java
+``` java
 PineEnhances.enableDelayHook();
 ```
 
@@ -126,7 +126,7 @@ PineEnhances.enableDelayHook();
 - 可能不兼容部分设备/系统。
 
 - 由于[#11](https://github.com/canyie/pine/issues/11)，我们建议尽量hook并发较少的方法，举个例子：
-```java
+``` java
 public static void method() {
     synchronized (sLock) {
         methodLocked();

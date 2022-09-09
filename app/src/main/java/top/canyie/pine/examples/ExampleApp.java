@@ -3,26 +3,69 @@ package top.canyie.pine.examples;
 import android.annotation.SuppressLint;
 import android.app.Application;
 import android.content.Context;
+import android.os.SystemClock;
 import android.util.Log;
 
 import java.io.File;
 
 import top.canyie.pine.Pine;
 import top.canyie.pine.PineConfig;
-
+import top.canyie.pine.callback.MethodHook;
+import top.canyie.pine.examples.test.Arg0Test;
+import top.canyie.pine.examples.test.Arg4444Test;
+import top.canyie.pine.examples.test.Arg4448Test;
+import top.canyie.pine.examples.test.Arg444Test;
+import top.canyie.pine.examples.test.Arg4484Test;
+import top.canyie.pine.examples.test.Arg4488Test;
+import top.canyie.pine.examples.test.Arg448Test;
+import top.canyie.pine.examples.test.Arg44Test;
+import top.canyie.pine.examples.test.Arg4844Test;
+import top.canyie.pine.examples.test.Arg4848Test;
+import top.canyie.pine.examples.test.Arg484Test;
+import top.canyie.pine.examples.test.Arg4884Test;
+import top.canyie.pine.examples.test.Arg4888Test;
+import top.canyie.pine.examples.test.Arg488Test;
+import top.canyie.pine.examples.test.Arg48Test;
+import top.canyie.pine.examples.test.Arg4Test;
+import top.canyie.pine.examples.test.Arg8444Test;
+import top.canyie.pine.examples.test.Arg8448Test;
+import top.canyie.pine.examples.test.Arg844Test;
+import top.canyie.pine.examples.test.Arg8484Test;
+import top.canyie.pine.examples.test.Arg8488Test;
+import top.canyie.pine.examples.test.Arg848Test;
+import top.canyie.pine.examples.test.Arg84Test;
+import top.canyie.pine.examples.test.Arg8844Test;
+import top.canyie.pine.examples.test.Arg8848Test;
+import top.canyie.pine.examples.test.Arg884Test;
+import top.canyie.pine.examples.test.Arg8884Test;
+import top.canyie.pine.examples.test.Arg8888Test;
+import top.canyie.pine.examples.test.Arg888Test;
+import top.canyie.pine.examples.test.Arg88Test;
+import top.canyie.pine.examples.test.Arg8Test;
+import top.canyie.pine.examples.test.ConstructorTest;
+import top.canyie.pine.examples.test.DelayHookTest;
+import top.canyie.pine.examples.test.DirectMethodTest;
+import top.canyie.pine.examples.test.DirectRegisterJNITest;
+import top.canyie.pine.examples.test.DynamicLookupJNITest;
+import top.canyie.pine.examples.test.GCTest;
+import top.canyie.pine.examples.test.Mytest;
+import top.canyie.pine.examples.test.NonStaticTest;
+import top.canyie.pine.examples.test.NotInitedTest;
+import top.canyie.pine.examples.test.ProxyTest;
+import top.canyie.pine.examples.test.TestItem;
+import top.canyie.pine.examples.test.ThrowExceptionTest;
+import top.canyie.pine.examples.test.ToastHookTest;
 import xcrash.ICrashCallback;
 import xcrash.XCrash;
-
-import top.canyie.pine.examples.test.*;
 
 /**
  * @author canyie
  */
 public class ExampleApp extends Application {
-    public static final String TAG = "PineExample";
+    public static final String TAG = "Pine.Example";
     public static final TestItem TOAST_TEST = new TestItem("Toast.makeText Hook", new ToastHookTest());
     public static final TestItem GC_TEST = new TestItem("Run GC", new GCTest());
-    public static final TestItem TOGGLE_DELAY_HOOK_TEST  = new TestItem("Enable/Disable Delay Hook", new DelayHookTest());
+    public static final TestItem TOGGLE_DELAY_HOOK_TEST = new TestItem("Enable/Disable Delay Hook", new DelayHookTest());
     public static final TestItem[] ALL_TESTS = {
             TOGGLE_DELAY_HOOK_TEST,
             new TestItem("Non-Static Method Hook", new NonStaticTest()),
@@ -69,13 +112,15 @@ public class ExampleApp extends Application {
     };
     private static ExampleApp instance;
 
-    @Override protected void attachBaseContext(Context base) {
+    @Override
+    protected void attachBaseContext(Context base) {
         super.attachBaseContext(base);
         instance = this;
         initXCrash();
     }
 
-    @SuppressWarnings("ResultOfMethodCallIgnored") @SuppressLint("SetWorldReadable")
+    @SuppressWarnings("ResultOfMethodCallIgnored")
+    @SuppressLint("SetWorldReadable")
     private void initXCrash() {
         File tombstones = new File(getFilesDir(), "tombstones");
         if (!tombstones.exists()) tombstones.mkdirs();
@@ -83,7 +128,8 @@ public class ExampleApp extends Application {
         tombstones.setExecutable(true, false);
 
         ICrashCallback callback = new ICrashCallback() {
-            @Override public void onCrash(String logPath, String emergency) {
+            @Override
+            public void onCrash(String logPath, String emergency) {
                 Log.e(TAG, "XCrash triggered: logPath " + logPath + " emergency " + emergency);
                 new File(logPath).setReadable(true, false);
             }
@@ -106,12 +152,69 @@ public class ExampleApp extends Application {
                 .setAnrCallback(callback));
     }
 
-    @Override public void onCreate() {
+    @Override
+    public void onCreate() {
         super.onCreate();
 
         PineConfig.debug = true;
         PineConfig.debuggable = BuildConfig.DEBUG;
         Pine.disableJitInline();
+        test();
+    }
+
+    private void test() {
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    mydemo();
+                } catch (Throwable e) {
+                    Pine.log(e);
+                }
+                SystemClock.sleep(5 * 1000);
+                Log.i(TAG, "target目标实际应该:3, 实际结果: " + Mytest.target(2));
+//                Log.i(TAG, "noStaticTarget目标实际应该:7, 实际结果: " + new Mytest().noStaticTarget(6));
+            }
+        }).start();
+    }
+
+    private void mydemo() throws NoSuchMethodException {
+        Pine.hook(Mytest.class.getDeclaredMethod("target", int.class), new MethodHook() {
+            @Override
+            public void beforeCall(Pine.CallFrame callFrame) {
+
+                StringBuffer sb = new StringBuffer();
+                sb.append("Before call target(").append(callFrame.args[0]).append(")")
+                        .append("\r\n\t修改参数为4")
+                ;
+                callFrame.args[0] = 4;
+                Log.i(TAG, sb.toString());
+            }
+
+            @Override
+            public void afterCall(Pine.CallFrame callFrame) {
+                Log.i(TAG, "After " + callFrame.thisObject + " target()");
+            }
+        });
+
+//        Pine.hook(Mytest.class.getDeclaredMethod("noStaticTarget", int.class), new MethodHook() {
+//            @Override
+//            public void beforeCall(Pine.CallFrame callFrame) {
+//
+//                StringBuffer sb = new StringBuffer();
+//                sb.append("Before call target(").append(callFrame.args[0]).append(")")
+//                        .append("\r\n\t修改参数为-1")
+//                ;
+//                callFrame.args[0] = -1;
+//                Log.i(TAG, sb.toString());
+//            }
+//
+//            @Override
+//            public void afterCall(Pine.CallFrame callFrame) {
+//                Log.i(TAG, "After target() result:" +callFrame.getResult());
+//            }
+//        });
     }
 
     public static ExampleApp getInstance() {

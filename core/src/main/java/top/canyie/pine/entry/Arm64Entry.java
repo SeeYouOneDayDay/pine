@@ -1,5 +1,7 @@
 package top.canyie.pine.entry;
 
+import android.util.Log;
+
 import top.canyie.pine.Pine;
 import top.canyie.pine.utils.Three;
 
@@ -15,6 +17,7 @@ public final class Arm64Entry {
     private static final long INT_BITS = 0xffffffffL;
     private static final long SHORT_BITS = 0xffffL;
     private static final long BYTE_BITS = 0xffL;
+    private static final String TAG = "Arm64Entry";
 
     private Arm64Entry() {
     }
@@ -26,6 +29,19 @@ public final class Arm64Entry {
 
     private static int intBridge(long artMethod, long extras, long sp,
                                  long x4, long x5, long x6, long x7) throws Throwable {
+
+        Pine.debug(Log.getStackTraceString(new Exception("----intBridge堆栈---")));
+
+        Pine.log(TAG, "----intBridge---"
+                + "\r\n\tartMethod:" + artMethod
+                + "\r\n\textras:" + extras
+                + "\r\n\tsp:" + sp
+                + "\r\n\tx4:" + x4
+                + "\r\n\tx5:" + x5
+                + "\r\n\tx6:" + x6
+                + "\r\n\tx7:" + x7
+        );
+
         return (int) handleBridge(artMethod, extras, sp, x4, x5, x6, x7);
     }
 
@@ -79,8 +95,7 @@ public final class Arm64Entry {
      * but the lr register is not 0 at the entry/exit of the proxy method.
      * Is the lr register assigned to 0 after the proxy method returns?
      */
-    private static Object handleBridge(long artMethod, long originExtras, long sp,
-                                       long x4, long x5, long x6, long x7) throws Throwable {
+    private static Object handleBridge(long artMethod, long originExtras, long sp, long x4, long x5, long x6, long x7) throws Throwable {
         // Clone the extras and unlock to minimize the time we hold the lock
         long extras = Pine.cloneExtras(originExtras);
         Pine.log("handleBridge: artMethod=%#x originExtras=%#x extras=%#x sp=%#x", artMethod, originExtras, extras, sp);
