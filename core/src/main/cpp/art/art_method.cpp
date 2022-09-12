@@ -224,6 +224,7 @@ void ArtMethod::BackupFrom(ArtMethod *source, void *entry, bool is_inline_hook, 
         memcpy(this, source, size);
     }
 
+    // 拷贝完 需要调整方法的权限标记位--参考下
     uint32_t access_flags = source->GetAccessFlags();
     if (Android::version >= Android::kN) {
         if (Android::version >= Android::kR) access_flags &= ~kAccPreCompiled;
