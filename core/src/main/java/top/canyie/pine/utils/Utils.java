@@ -10,6 +10,8 @@ import java.lang.reflect.Member;
 import java.lang.reflect.Method;
 
 public class Utils {
+    private static final String TAG = "Pine.utils";
+
     private static Field artMethod = null;
 
     static {
@@ -18,7 +20,6 @@ public class Utils {
         }
     }
 
-    private static final String TAG = "Pine.utils";
 
     public static long getThreadPeer() {
         Object resulst = ReflectionHelper.getFieldValue(Thread.class, "nativePeer", Thread.currentThread());
