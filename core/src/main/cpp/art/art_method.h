@@ -57,18 +57,19 @@ namespace pine::art {
             return reinterpret_cast<jmethodID>(this);
         }
 
-        // Only works on android 7.0+
+        // Only works on Android 6.0+
         uint32_t GetDeclaringClass() {
-            return declaring_class->Get(this);
+            return declaring_class.Get(this);
         }
 
-        // Only works on android 7.0+
+        // Only works on Android 6.0+
         void SetDeclaringClass(uint32_t new_declaring_class) {
-            declaring_class->Set(this, new_declaring_class);
+            declaring_class.Set(this, new_declaring_class);
         }
 
         bool IsCompiled() {
-            return GetEntryPointFromCompiledCode() != GetInterpreterBridge();
+            void* entry = GetEntryPointFromCompiledCode();
+            return entry != GetInterpreterBridge() && entry != ExecuteNterpImpl;
         }
 
         bool Compile(Thread* thread) {
@@ -216,7 +217,7 @@ namespace pine::art {
             uint32_t code_size = *reinterpret_cast<uint32_t*>(
                     reinterpret_cast<uintptr_t>(GetCompiledCodeAddr()) - sizeof(uint32_t));
             if (Android::version >= Android::kO) {
-                // On Android 8+, The highest bit is used to signify if the compiled
+                // On Android 8+, the highest bit is used to signify if the compiled
                 // code with the method header has should_deoptimize flag.
                 uint32_t kShouldDeoptimizeMask = 0x80000000;
                 code_size &= ~kShouldDeoptimizeMask;
@@ -231,6 +232,10 @@ namespace pine::art {
     private:
         static int32_t GetDefaultAccessFlagsOffset() {
             switch (Android::version) {
+                default:
+                    LOGW("Unsupported Android API level %d, using Android UpsideDownCake", Android::version);
+                    [[fallthrough]];
+                case Android::kU :
                 case Android::kT :
                 case Android::kSL :
                 case Android::kS :
@@ -248,14 +253,15 @@ namespace pine::art {
                     return 20;
                 case Android::kL :
                     return 56;
-                default:
-                    // Android Kitkat doesn't use this function.
-                    FATAL("Unexpected android version %d", Android::version);
             }
         }
 
         static int32_t GetDefaultEntryPointFromJniOffset() {
             switch (Android::version) {
+                default:
+                    LOGW("Unsupported Android API level %d, using Android UpsideDownCake", Android::version);
+                    [[fallthrough]];
+                case Android::kU :
                 case Android::kT :
                 case Android::kSL :
                 case Android::kS :
@@ -276,14 +282,15 @@ namespace pine::art {
                     return Android::Is64Bit() ? 48 : 40;
                 case Android::kL :
                     return 32;
-                default:
-                    // Android Kitkat doesn't use this function.
-                    FATAL("Unexpected android version %d", Android::version);
             }
         }
 
         static int32_t GetDefaultEntryPointFromQuickCompiledCodeOffset() {
             switch (Android::version) {
+                default:
+                    LOGW("Unsupported Android API level %d, using Android UpsideDownCake", Android::version);
+                    [[fallthrough]];
+                case Android::kU :
                 case Android::kT :
                 case Android::kSL :
                 case Android::kS :
@@ -304,9 +311,6 @@ namespace pine::art {
                     return Android::Is64Bit() ? 56 : 44;
                 case Android::kL :
                     return 40;
-                default:
-                    // Android Kitkat doesn't use this function.
-                    FATAL("Unexpected android version %d", Android::version);
             }
         }
 
@@ -325,6 +329,7 @@ namespace pine::art {
         static void* art_quick_generic_jni_trampoline;
         static void* art_interpreter_to_interpreter_bridge;
         static void* art_interpreter_to_compiled_code_bridge;
+        static void* ExecuteNterpImpl;
 
         static void (*copy_from)(ArtMethod*, ArtMethod*, size_t);
         static void (*throw_invocation_time_error)(ArtMethod*);
@@ -336,7 +341,7 @@ namespace pine::art {
         static Member<ArtMethod, void*> entry_point_from_jni_;
 
         static Member<ArtMethod, void*>* entry_point_from_interpreter_;
-        static Member<ArtMethod, uint32_t>* declaring_class; // GCRoot is uint32_t
+        static Member<ArtMethod, uint32_t> declaring_class; // GCRoot is uint32_t
 
         DISALLOW_IMPLICIT_CONSTRUCTORS(ArtMethod);
     };

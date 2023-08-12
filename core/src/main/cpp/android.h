@@ -6,6 +6,7 @@
 #define PINE_ANDROID_H
 
 #include <jni.h>
+#include <android/api-level.h>
 #include "art/gc_defs.h"
 #include "utils/log.h"
 #include "utils/macros.h"
@@ -105,6 +106,7 @@ namespace pine {
         static constexpr int kS = 31;
         static constexpr int kSL = 32;
         static constexpr int kT = 33;
+        static constexpr int kU = 34;
     private:
         static void DisableHiddenApiPolicy(const ElfImg* handle, bool application, bool platform);
         static void InitMembersFromRuntime(JavaVM* jvm, const ElfImg* handle);
@@ -116,14 +118,16 @@ namespace pine {
                 return Is64Bit() ? 528 : 0 /* TODO: Calculate offset on 32-bit. Currently force fallback to search memory. */;
             }
             switch (version) {
+                default:
+                    LOGW("Unsupported Android API level %d", Android::version);
+                    [[fallthrough]];
+                case kU :
                 case kT:
                 case kSL:
                 case kS:
                 case kR:
                 case kQ:
                     return Is64Bit() ? 496 : 288;
-                default:
-                    FATAL("Unexpected android version %d", version);
             }
         }
 

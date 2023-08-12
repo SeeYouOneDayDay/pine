@@ -41,7 +41,26 @@ void Android::Init(JNIEnv* env, int sdk_version, bool disable_hiddenapi_policy, 
     }
 
     {
+        bool eng_build = false;
         ElfImg art_lib_handle("libart.so");
+        if (UNLIKELY(!art_lib_handle.IsOpened())) {
+            // Running on eng build ROMs?
+            art_lib_handle.RelativeOpen("libartd.so", true);
+            if (LIKELY(art_lib_handle.IsOpened())) {
+                eng_build = true;
+            } else {
+                // Alibaba YunOS AOC runtime?
+                constexpr const char* kLibAocPath = "/system/lib"
+#ifdef __LP64__
+                                                    "64"
+#endif
+                                                    "/libaoc.so";
+                if (access(kLibAocPath, R_OK) == 0) {
+                    art_lib_handle.Open(kLibAocPath, true);
+                }
+            }
+        }
+
         if (Android::version >= Android::kR) {
             suspend_all = reinterpret_cast<void (*)(void*, const char*, bool)>(art_lib_handle.GetSymbolAddress(
                     "_ZN3art16ScopedSuspendAllC1EPKcb"));
@@ -81,7 +100,7 @@ void Android::Init(JNIEnv* env, int sdk_version, bool disable_hiddenapi_policy, 
         art::Thread::Init(&art_lib_handle);
         art::ArtMethod::Init(&art_lib_handle);
         if (sdk_version >= kN) {
-            ElfImg jit_lib_handle("libart-compiler.so", false);
+            ElfImg jit_lib_handle(eng_build ? "libartd-compiler.so" : "libart-compiler.so", false);
             art::Jit::Init(&art_lib_handle, &jit_lib_handle);
         }
 
@@ -141,8 +160,7 @@ static bool FakeProcessProfilingInfo() {
 }
 
 bool Android::DisableProfileSaver() {
-    // If users need this feature very much,
-    // we may find these symbols during initialization in the future to reduce time consumption.
+    // I think most users don't need this feature, so I don't get the symbol during initialization...
     void* process_profiling_info;
     {
         ElfImg handle("libart.so");
@@ -173,7 +191,7 @@ void Android::InitMembersFromRuntime(JavaVM* jvm, const ElfImg* handle) {
     if (version < kQ) {
         // ClassLinker is unnecessary before R.
         // JIT was added in Android N but MoveObsoleteMethod was added in Android O
-        // and didn't find a stable way to retrieve jit code cache until Q
+        // and I didn't find a stable way to retrieve jit code cache until Q
         // from Runtime object, so try to retrieve from ProfileSaver.
         // TODO: Still clearing jit info on Android N but only for jit-compiled methods.
         if (version >= kO) {
@@ -192,7 +210,8 @@ void Android::InitMembersFromRuntime(JavaVM* jvm, const ElfImg* handle) {
     // This commit added a pointer member between `class_linker_` and `java_vm_`. Need to calibrate offset here.
     // https://android.googlesource.com/platform/art/+/4dcac3629ea5925e47b522073f3c49420e998911
     // https://github.com/crdroidandroid/android_art/commit/aa7999027fa830d0419c9518ab56ceb7fcf6f7f1
-    bool has_smaller_irt = handle->GetSymbolAddress(
+    // https://android.googlesource.com/platform/art/+/849d09a81907f16d8ccc6019b8baf86a304b730c
+    bool has_smaller_irt = version >= kT || handle->GetSymbolAddress(
             "_ZN3art17SmallIrtAllocator10DeallocateEPNS_8IrtEntryE", false) != nullptr;
 
     size_t jvm_offset = OffsetOfJavaVm(has_smaller_irt);

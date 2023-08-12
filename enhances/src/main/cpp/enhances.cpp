@@ -204,6 +204,38 @@ void PineEnhances_recordMethodHooked(JNIEnv*, jclass, jlong method, jlong backup
     backup_UpdateMethodsCode(instrumentation_, b, saved_entry);
 }
 
+std::string GetRuntimeLibraryName(JNIEnv* env) {
+    // initClassInitMonitor will always be called after Pine core library is initialized
+    // At this time we can directly access hidden APIs
+    jclass VMRuntime = env->FindClass("dalvik/system/VMRuntime");
+    jmethodID getRuntime = VMRuntime
+            ? env->GetStaticMethodID(VMRuntime, "getRuntime", "()Ldalvik/system/VMRuntime;")
+            : nullptr;
+    jmethodID getVMLibrary = getRuntime
+            ? env->GetMethodID(VMRuntime, "vmLibrary", "()Ljava/lang/String;")
+            : nullptr;
+    if (getVMLibrary) {
+        jobject vmRuntime = env->CallStaticObjectMethod(VMRuntime, getRuntime);
+        if (vmRuntime) {
+            jstring vmLibrary = static_cast<jstring>(env->CallObjectMethod(vmRuntime, getVMLibrary));
+            env->DeleteLocalRef(vmRuntime);
+            if (vmLibrary) {
+                env->DeleteLocalRef(VMRuntime);
+                const char* vm_library_cstr = env->GetStringUTFChars(vmLibrary, nullptr);
+                std::string vm_library(vm_library_cstr);
+                env->ReleaseStringUTFChars(vmLibrary, vm_library_cstr);
+                env->DeleteLocalRef(vmLibrary);
+                return vm_library;
+            }
+        }
+    }
+    LOGE("Failed to get VM library name");
+    env->ExceptionDescribe();
+    env->ExceptionClear();
+    if (VMRuntime) env->DeleteLocalRef(VMRuntime);
+    return "libart.so";
+}
+
 jboolean PineEnhances_initClassInitMonitor(JNIEnv* env, jclass PineEnhances, jint sdk_level,
                                            jlong openElf, jlong findElfSymbol, jlong closeElf) {
      onClassInit_ = env->GetStaticMethodID(PineEnhances, "onClassInit", "(J)V");
@@ -220,7 +252,8 @@ jboolean PineEnhances_initClassInitMonitor(JNIEnv* env, jclass PineEnhances, jin
      FindElfSymbol = reinterpret_cast<void* (*)(void*, const char*, bool)>(findElfSymbol);
      auto CloseElf = reinterpret_cast<void (*)(void*)>(closeElf);
 
-     void* handle = OpenElf("libart.so");
+     auto vm_library = GetRuntimeLibraryName(env);
+     void* handle = OpenElf(vm_library.data());
 
      GetClassDef = reinterpret_cast<void* (*)(void*)>(FindElfSymbol(handle,
              "_ZN3art6mirror5Class11GetClassDefEv", true));
@@ -233,15 +266,20 @@ jboolean PineEnhances_initClassInitMonitor(JNIEnv* env, jclass PineEnhances, jin
 #define HOOK_FUNC(name) hooked |= HookFunc(name, (void*) replace_##name , (void**) &backup_##name)
 #define HOOK_SYMBOL(name, symbol) hooked |= HookSymbol(handle, symbol, (void*) replace_##name , (void**) &backup_##name )
 
-     HOOK_SYMBOL(ShouldUseInterpreterEntrypoint, "_ZN3art11ClassLinker30ShouldUseInterpreterEntrypointEPNS_9ArtMethodEPKv");
-     if (!hooked) {
-         // Android Tiramisu?
-         HOOK_SYMBOL(ShouldStayInSwitchInterpreter, "_ZN3art11interpreter29ShouldStayInSwitchInterpreterEPNS_9ArtMethodE");
+     // Before 7.0, it is NeedsInterpreter which is inlined so cannot be hooked
+     // But the logic which forces code to be executed by interpreter is added in Android 8.0
+     // And we have hooked UpdateMethodsCode to avoid entry updating, so it should be safe to skip
+     if (sdk_level >= __ANDROID_API_N__) {
+         HOOK_SYMBOL(ShouldUseInterpreterEntrypoint, "_ZN3art11ClassLinker30ShouldUseInterpreterEntrypointEPNS_9ArtMethodEPKv");
+         if (!hooked) {
+             // Android Tiramisu?
+             HOOK_SYMBOL(ShouldStayInSwitchInterpreter, "_ZN3art11interpreter29ShouldStayInSwitchInterpreterEPNS_9ArtMethodE");
+         }
+         if (!hooked) {
+             LOGE("Failed to hook ShouldUseInterpreterEntrypoint/ShouldStayInSwitchInterpreter. Hook may not work.");
+         }
+         hooked = false;
      }
-     if (!hooked) {
-         LOGE("Failed to hook ShouldUseInterpreterEntrypoint/ShouldStayInSwitchInterpreter. Hook may not work.");
-     }
-     hooked = false;
 
      if (sdk_level >= __ANDROID_API_Q__) {
          // Note: kVisiblyInitialized is not implemented in Android Q,
@@ -262,8 +300,8 @@ jboolean PineEnhances_initClassInitMonitor(JNIEnv* env, jclass PineEnhances, jin
          }
      }
      HOOK_SYMBOL(FixupStaticTrampolines, "_ZN3art11ClassLinker22FixupStaticTrampolinesENS_6ObjPtrINS_6mirror5ClassEEE");
-     if (!hooked && sdk_level == __ANDROID_API_N__) {
-         // huawei lon-al00 android 7.0 api level 24
+     if (!hooked) {
+         // Before Android 8.0, it uses raw mirror::Class* without ObjPtr<>
          HOOK_SYMBOL(FixupStaticTrampolines, "_ZN3art11ClassLinker22FixupStaticTrampolinesEPNS_6mirror5ClassE");
      }
 #undef HOOK_SYMBOL

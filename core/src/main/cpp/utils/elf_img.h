@@ -53,11 +53,15 @@ namespace pine {
         Elf_Addr GetSymbolOffset(const char* name, bool warn_if_missing = true) const;
         void* GetSymbolAddress(const char* name, bool warn_if_missing = true) const;
 
+        void Open(const char* path, bool warn_if_symtab_not_found);
+        void RelativeOpen(const char* elf, bool warn_if_symtab_not_found);
+        bool IsOpened() const {
+            return base != nullptr;
+        }
+
         ~ElfImg();
 
     private:
-        void Open(const char* path, bool warn_if_symtab_not_found);
-        void RelativeOpen(const char* elf, bool warn_if_symtab_not_found);
         // Pine changed: GetModuleBase is private
         void* GetModuleBase(const char* name);
 

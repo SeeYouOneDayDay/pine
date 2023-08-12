@@ -80,7 +80,7 @@ void Pine_init0(JNIEnv *env, jclass Pine, jint androidVersion, jboolean debug, j
                   disableHiddenApiPolicyForPlatformDomain);
     {
         ScopedLocalClassRef Ruler(env, "top/canyie/pine/Ruler");
-        auto m1 = art::ArtMethod::Require(env, Ruler.Get(), "m1", "()V", true);
+        auto m1 = art::ArtMethod::Require(env, Ruler.Get(), "m1", "(F)V", true);
         auto m2 = art::ArtMethod::Require(env, Ruler.Get(), "m2", "()V", true);
 
         uint32_t expected_access_flags;
@@ -178,16 +178,20 @@ jobject Pine_hook0(JNIEnv *env, jclass, jlong threadAddress, jclass declaring, j
     art::ArtMethod *backup;
     if (WellKnownClasses::java_lang_reflect_ArtMethod) {
         // If ArtMethod has mirror class in java, we cannot use malloc to direct
-        // allocate a instance because it must has a record in Runtime.
+        // allocate an instance because it must has a record in Runtime.
 
         backup = static_cast<art::ArtMethod *>(thread->AllocNonMovable(
                 WellKnownClasses::java_lang_reflect_ArtMethod));
         if (UNLIKELY(!backup)) {
+#if __ANDROID_API__ < __ANDROID_API_L__
             // On Android kitkat, moving gc is not supported in art. All objects are immovable.
-            if (UNLIKELY(Android::version != Android::kK)) {
+            if (UNLIKELY(Android::version >= Android::kL)) {
+#endif
                 LOGE("Failed to allocate an immovable object for creating backup method.");
                 env->ExceptionClear();
+#if __ANDROID_API__ < __ANDROID_API_L__
             }
+#endif
 
             jobject javaBackup = env->AllocObject(WellKnownClasses::java_lang_reflect_ArtMethod);
             if (UNLIKELY(env->ExceptionCheck())) {
@@ -216,7 +220,6 @@ jobject Pine_hook0(JNIEnv *env, jclass, jlong threadAddress, jclass declaring, j
     char error_msg[288];
 
     {
-        // 替换跳板
         // An ArtMethod is a very important object. Many threads depend on their values,
         // so we need to suspend other threads to avoid errors when hooking.
         ScopedSuspendVM suspend_vm(thread);
@@ -419,7 +422,7 @@ void Pine_syncMethodInfo(JNIEnv *env, jclass, jobject javaOrigin, jobject javaBa
     auto origin = art::ArtMethod::FromReflectedMethod(env, javaOrigin);
     auto backup = art::ArtMethod::FromReflectedMethod(env, javaBackup);
 
-    // ArtMethod is actually an instance of java class "java.lang.reflect.ArtMethod" on pre M
+    // An ArtMethod is actually an instance of java class "java.lang.reflect.ArtMethod" on pre M
     // declaring_class is a reference field so the runtime itself will update it if moved by GC
     if (Android::version >= Android::kM) {
         uint32_t declaring_class = origin->GetDeclaringClass();
